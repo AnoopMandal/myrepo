@@ -1,0 +1,292 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "",
+    "Metadata": {},
+    "Parameters": {
+        "VPCCidr": {
+            "Description": "enter the cidr range for the VPC",
+            "Type": "String",
+            "Default": "10.23.0.0/16",
+            "AllowedValues": ["10.23.0.0/16","10.24.0.0/16"]
+        },
+        
+        "SubnetPrivate": {
+            "Description": "Enter cidr for Private subnet",
+            "Type": "String",
+            "Default": "10.23.1.0/24"
+        },
+        
+        "SubnetPublic": {
+            "Description": "Enter cidr for Private subnet",
+            "Type": "String",
+            "Default": "10.23.2.0/24"
+        },
+        "SubnetPriAZ":{
+            "Description": "choose AZ for private subnet",
+            "Type": "AWS::EC2::AvailabilityZone::Name"    
+        },
+        "SubnetPubAZ":{
+            "Description":"choose AZ for public subnet",
+            "Type": "AWS::EC2::AvailabilityZone::Name"    
+        },
+        "webserverkey": {
+            "Description": "-",
+            "Type": "AWS::EC2::KeyPair::KeyName"
+        },
+        "instancetype": {
+            "Description": "Instance Type",
+            "Type": "String",
+            "Default": "t2.micro",
+            "AllowedValues":["t2.micro","t2.medium"]
+        }
+        
+        },
+    "Mappings": {
+        "RegionMap":{
+            "us-east-1":{
+                "64":"ami-06640050dc3f556bb",
+                "32":"randomami"
+            },
+            "us-west-1":{
+                "64":"randomami2",
+                "32":"randomami3"
+            }
+        }
+
+    
+        },
+    "Conditions": {
+    
+        },
+    "Resources": {
+        "MyAppVPC": {
+          "Type": "AWS::EC2::VPC",
+          "Properties": {
+            "CidrBlock": 
+            { "Ref": "VPCCidr" },
+            "Tags": [
+                {"Key": "Name",
+                "Value": "MyDevVPC"
+                }
+    
+            ]
+          }
+        }, 
+        "subnet1": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+              "MapPublicIpOnLaunch": false,
+              "AvailabilityZone": {
+                "Ref": "SubnetPriAZ"
+              },
+              "VpcId": 
+              { "Ref": "MyAppVPC" },
+              "CidrBlock": 
+              { "Ref": "SubnetPrivate" },
+              "Tags": [{
+                "Key": "Name",
+                "Value":"Private subnet"
+              }]
+            }
+          },
+        "subnet2": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+              "MapPublicIpOnLaunch": true,
+              "AvailabilityZone": {
+                "Ref": "SubnetPubAZ"
+              },
+              "VpcId": 
+              { "Ref": "MyAppVPC" },
+              "CidrBlock": 
+              { "Ref": "SubnetPublic" },
+              "Tags": [{
+                "Key": "Name",
+                "Value":"public subnet"
+              }]
+            }
+          },
+        
+        "IGDev": {
+          "Type": "AWS::EC2::InternetGateway",
+          "Properties": {
+            "Tags":[
+            { "Key": "Name", "Value":  "DevIG" }
+            ]
+          }
+        },
+        "AttachIGateway": {
+          "Type": "AWS::EC2::VPCGatewayAttachment",
+          "Properties": {
+            "VpcId": { "Ref": "MyAppVPC" },
+            "InternetGatewayId": { "Ref": "IGDev" }
+          }
+        },
+        
+        "PublicRT": {
+          "Type": "AWS::EC2::RouteTable",
+          "Properties": {
+            "VpcId":{ "Ref": "MyAppVPC" },
+            "Tags":[
+            { "Key": "Name", "Value":  "PublicRTable" }
+            ]
+          }
+        },
+        
+        "PublicRoute": {
+          "Type": "AWS::EC2::Route",
+          "Properties": {
+            "RouteTableId": { "Ref": "PublicRT" },
+            "DestinationCidrBlock": "0.0.0.0/0",
+            "GatewayId": { "Ref": "IGDev" }
+          }
+        },
+        "PublicRTassocation": {
+          "Type": "AWS::EC2::SubnetRouteTableAssociation",
+          "Properties": {
+            "SubnetId": { "Ref": "subnet2" },
+            "RouteTableId": { "Ref": "PublicRT" }
+            
+          }
+        },
+        "PrivateRT": {
+          "Type": "AWS::EC2::RouteTable",
+          "Properties": {
+            "VpcId": { "Ref": "MyAppVPC" },
+            "Tags":[
+            { "Key": "Name", "Value":  "PrivateRT" }
+            ]
+          }
+        },
+        
+        "WebSecGroup" : {
+          "Type" : "AWS::EC2::SecurityGroup",
+          "Properties" : {
+            "GroupName": "WebSecGroup",
+            "GroupDescription" : "WebSecGroup",
+            "SecurityGroupIngress" : [ 
+                {
+                    "IpProtocol" : "tcp",
+                    "FromPort" : 80,
+                    "ToPort" : 80,
+                    "CidrIp" : "0.0.0.0/0"
+                },
+                {
+                    "IpProtocol" : "tcp",
+                    "FromPort" : 22,
+                    "ToPort" : 22,
+                    "CidrIp" : "0.0.0.0/0"
+                }
+            ],
+            "VpcId" : { "Ref": "MyAppVPC" },  
+            "Tags":[
+            { "Key": "Name", "Value":  "WebSecGroup" }
+            ]
+          }
+        },
+
+        
+        "master": {
+            "Type": "AWS::EC2::Instance",
+            "Properties": {
+                "KeyName": { "Ref": "webserverkey" },
+                "ImageId": 
+                {"Fn::FindInMap": [
+                    "RegionMap",
+                    { "Ref": "AWS::Region" },
+                    "64"
+                ]}
+                ,
+                "InstanceType": { "Ref": "instancetype" },
+                "Monitoring": "false",
+                "SecurityGroupIds" : [{ "Ref": "WebSecGroup"}],
+                "SubnetId":{ "Ref": "subnet2" },
+                "Tags":[
+                { "Key": "Name", "Value":  "master" }
+                ],
+                "UserData": {
+                    "Fn::Base64": {
+                        "Fn::Join": [
+                            "",
+                            [
+                                "#!/bin/bash -ex \n",
+                                "yum install httpd -y \n",
+                                "chkconfig httpd on \n",
+                                "echo '<h1>Coming form master</h1>' > /var/www/html/index.html \n",
+                                "service httpd start \n"
+                            ]
+                        ]
+                    }
+                }
+            }
+        },
+        "worker01": {
+            "Type": "AWS::EC2::Instance",
+            "Properties": {
+                "KeyName": { "Ref": "webserverkey" },
+                "ImageId": {"Fn::FindInMap": [
+                    "RegionMap",
+                    { "Ref": "AWS::Region" },
+                    "64"
+                ]},
+                "InstanceType": { "Ref": "instancetype" },
+                "Monitoring": "false",
+                "SecurityGroupIds" : [{ "Ref": "WebSecGroup"}],
+                "SubnetId":{ "Ref": "subnet2" },
+                "Tags":[
+                { "Key": "Name", "Value":  "worker01" }
+                ],
+                "UserData": {
+                    "Fn::Base64": {
+                        "Fn::Join": [
+                            "",
+                            [
+                                "#!/bin/bash -ex \n",
+                                "yum install httpd -y \n",
+                                "chkconfig httpd on \n",
+                                "echo '<h1>Coming form worker01</h1>' > /var/www/html/index.html \n",
+                                "service httpd start \n"
+                            ]
+                        ]
+                    }
+                }
+            }
+        },
+        "worker02": {
+            "Type": "AWS::EC2::Instance",
+            "Properties": {
+                "KeyName": { "Ref": "webserverkey" },
+                "ImageId": {"Fn::FindInMap": [
+                    "RegionMap",
+                    { "Ref": "AWS::Region" },
+                    "64"
+                ]},
+                "InstanceType": { "Ref": "instancetype" },
+                "Monitoring": "false",
+                "SecurityGroupIds" : [{ "Ref": "WebSecGroup"}],
+                "SubnetId":{ "Ref": "subnet2" },
+                "Tags":[
+                { "Key": "Name", "Value":  "worker02" }
+                ],
+                "UserData": {
+                    "Fn::Base64": {
+                        "Fn::Join": [
+                            "",
+                            [
+                                "#!/bin/bash -ex \n",
+                                "yum install httpd -y \n",
+                                "chkconfig httpd on \n",
+                                "echo '<h1>Coming form worker02</h1>' > /var/www/html/index.html \n",
+                                "service httpd start \n"
+                            ]
+                        ]
+                    }
+                }
+            }
+        }
+
+        
+    
+    },
+        "Outputs": { }
+    }

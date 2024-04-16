@@ -1,0 +1,90 @@
+{
+"AWSTemplateFormatVersion": "2010-09-09",
+"Description": "",
+"Metadata": {},
+"Parameters": {
+    "VPCCidr": {
+        "Description": "enter the cidr range for the VPC",
+        "Type": "String",
+        "Default": "10.23.0.0/16",
+        "AllowedValues": ["10.23.0.0/16","10.24.0.0/16"]
+    },
+    
+    "SubnetPrivate": {
+        "Description": "Enter cidr for Private subnet",
+        "Type": "String",
+        "Default": "10.23.1.0/24"
+    },
+    
+    "SubnetPublic": {
+        "Description": "Enter cidr for Private subnet",
+        "Type": "String",
+        "Default": "10.23.2.0/24"
+    },
+    "SubnetPriAZ":{
+        "Description": "choose AZ for private subnet",
+        "Type": "AWS::EC2::AvailabilityZone::Name"    
+    },
+    "SubnetPubAZ":{
+        "Description":"choose AZ for public subnet",
+        "Type": "AWS::EC2::AvailabilityZone::Name"    
+    }
+    
+    },
+"Mappings": {
+
+    },
+"Conditions": {
+
+    },
+"Resources": {
+    "MyAppVPC": {
+      "Type": "AWS::EC2::VPC",
+      "Properties": {
+        "CidrBlock": 
+        { "Ref": "VPCCidr" },
+        "Tags": [
+            {"Key": "Name",
+            "Value": "MyDevVPC"
+            }
+
+        ]
+      }
+    }, 
+    "subnet1": {
+        "Type": "AWS::EC2::Subnet",
+        "Properties": {
+          "MapPublicIpOnLaunch": true,
+          "AvailabilityZone": {
+            "Ref": "SubnetPriAZ"
+          },
+          "VpcId": 
+          { "Ref": "MyAppVPC" },
+          "CidrBlock": 
+          { "Ref": "SubnetPrivate" },
+          "Tags": [{
+            "Key": "Name",
+            "Value":"Subnet1"
+          }]
+        }
+      },
+    "subnet2": {
+        "Type": "AWS::EC2::Subnet",
+        "Properties": {
+          "MapPublicIpOnLaunch": true,
+          "AvailabilityZone": {
+            "Ref": "SubnetPubAZ"
+          },
+          "VpcId": 
+          { "Ref": "MyAppVPC" },
+          "CidrBlock": 
+          { "Ref": "SubnetPublic" },
+          "Tags": [{
+            "Key": "Name",
+            "Value":"Subnet2"
+          }]
+        }
+      }
+    },
+    "Outputs": { }
+}
